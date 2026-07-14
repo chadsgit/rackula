@@ -25,6 +25,9 @@ import type {
   Slot,
   RackWidth,
   SlotWidth,
+  RailDeviceType,
+  PlacedRailDevice,
+  RailSide,
 } from "$lib/types";
 import type { Command, CommandType } from "$lib/stores/commands/types";
 import { toInternalUnits } from "$lib/utils/position";
@@ -150,6 +153,48 @@ export function createTestDevice(
     ...(overrides.position !== undefined
       ? { position: toInternalUnits(overrides.position) }
       : {}),
+  };
+}
+
+// =============================================================================
+// RailDeviceType / PlacedRailDevice Factories
+// =============================================================================
+
+export interface CreateTestRailDeviceTypeOptions {
+  slug?: string;
+  model?: string;
+  manufacturer?: string;
+  category?: DeviceCategory;
+  colour?: string;
+}
+
+/**
+ * Creates a test RailDeviceType with sensible defaults.
+ */
+export function createTestRailDeviceType(
+  overrides: CreateTestRailDeviceTypeOptions = {},
+): RailDeviceType {
+  return {
+    slug: overrides.slug ?? "test-rail-pdu",
+    model: overrides.model ?? "Test Rail PDU",
+    category: overrides.category ?? "power",
+    colour: overrides.colour ?? "#FFB86C",
+    ...(overrides.manufacturer ? { manufacturer: overrides.manufacturer } : {}),
+  };
+}
+
+/**
+ * Creates a test PlacedRailDevice with sensible defaults.
+ */
+export function createTestRailDevice(
+  overrides: Partial<PlacedRailDevice> = {},
+): PlacedRailDevice {
+  return {
+    id: overrides.id ?? generateId(),
+    device_type: "test-rail-pdu",
+    side: "left" as RailSide,
+    face: "front" as DeviceFace,
+    ...overrides,
   };
 }
 
