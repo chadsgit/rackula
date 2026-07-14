@@ -15,7 +15,9 @@ import type {
   DeviceFace,
   DeviceType,
   PlacedDevice,
+  PlacedRailDevice,
   Rack,
+  RailDeviceType,
   SlotPosition,
 } from "$lib/types";
 import { layoutDebug } from "$lib/utils/debug";
@@ -135,6 +137,25 @@ export function updateDeviceTypeRaw(
   });
 }
 
+/**
+ * Add a rail device type directly (raw)
+ * No undo/redo wrapper in v1 - custom rail device type creation via UI is
+ * out of scope; this exists to populate layout.rail_device_types from
+ * brand-pack data or tests.
+ * @param ctx - Layout state access
+ * @param railDeviceType - Rail device type to add
+ */
+export function addRailDeviceTypeRaw(
+  ctx: LayoutStateAccess,
+  railDeviceType: RailDeviceType,
+): void {
+  const layout = ctx.getLayout();
+  ctx.setLayout({
+    ...layout,
+    rail_device_types: [...(layout.rail_device_types ?? []), railDeviceType],
+  });
+}
+
 // =============================================================================
 // Placed Device Raw Mutators
 // =============================================================================
@@ -191,6 +212,81 @@ export function removeDeviceAtIndexRaw(
     devices: rack.devices.filter((_, i) => i !== index),
   }));
   return removed;
+}
+
+// =============================================================================
+// Placed Rail Device Raw Mutators
+// =============================================================================
+
+/**
+ * Place a rail device directly (raw) - no validation
+ * Targets the specified rack, or falls back to active rack
+ * @param ctx - Layout state access
+ * @param device - Rail device to place
+ * @param rackId - Optional rack ID to target (uses active rack if not provided)
+ * @returns Index where device was placed, or -1 if no rack available
+ */
+export function placeRailDeviceRaw(
+  ctx: LayoutStateAccess,
+  device: PlacedRailDevice,
+  rackId?: string,
+): number {
+  const target = getTargetRack(ctx, rackId);
+  if (!target) return -1;
+
+  const existingIds = new Set(
+    (target.rack.rail_devices ?? []).map((d) => d.id),
+  );
+  const safeDevice = existingIds.has(device.id)
+    ? { ...device, id: generateUniqueDeviceId(existingIds) }
+    : device;
+
+  const newRailDevices = [...(target.rack.rail_devices ?? []), safeDevice];
+  updateRackAtIndex(ctx, target.index, (rack) => ({
+    ...rack,
+    rail_devices: newRailDevices,
+  }));
+  return newRailDevices.length - 1;
+}
+
+/**
+ * Remove a rail device at index directly (raw)
+ * Uses active rack
+ * @param ctx - Layout state access
+ * @param index - Rail device index to remove
+ * @returns The removed device or undefined
+ */
+export function removeRailDeviceAtIndexRaw(
+  ctx: LayoutStateAccess,
+  index: number,
+): PlacedRailDevice | undefined {
+  const target = getTargetRack(ctx);
+  if (!target) return undefined;
+  const railDevices = target.rack.rail_devices ?? [];
+  if (index < 0 || index >= railDevices.length) return undefined;
+
+  const removed = railDevices[index];
+
+  updateRackAtIndex(ctx, target.index, (rack) => ({
+    ...rack,
+    rail_devices: (rack.rail_devices ?? []).filter((_, i) => i !== index),
+  }));
+  return removed;
+}
+
+/**
+ * Get a rail device at a specific index (active rack)
+ * @param ctx - Layout state access
+ * @param index - Rail device index
+ * @returns The rail device or undefined
+ */
+export function getRailDeviceAtIndex(
+  ctx: LayoutStateAccess,
+  index: number,
+): PlacedRailDevice | undefined {
+  const target = getTargetRack(ctx);
+  if (!target) return undefined;
+  return (target.rack.rail_devices ?? [])[index];
 }
 
 /**
@@ -472,11 +568,13 @@ export function getPlacedDevicesWithRackForType(
   ctx: LayoutStateAccess,
   slug: string,
 ): { rackId: string; device: PlacedDevice }[] {
-  return ctx.getLayout().racks.flatMap((rack) =>
-    rack.devices
-      .filter((d) => d.device_type === slug)
-      .map((d) => ({ rackId: rack.id, device: d })),
-  );
+  return ctx
+    .getLayout()
+    .racks.flatMap((rack) =>
+      rack.devices
+        .filter((d) => d.device_type === slug)
+        .map((d) => ({ rackId: rack.id, device: d })),
+    );
 }
 
 // =============================================================================
