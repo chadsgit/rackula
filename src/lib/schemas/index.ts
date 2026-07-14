@@ -75,6 +75,11 @@ export const DeviceFaceSchema = z.enum(["front", "rear", "both"]);
 export const WeightUnitSchema = z.enum(["kg", "lb"]);
 
 /**
+ * Rail side enum for 0U rail-mounted devices
+ */
+export const RailSideSchema = z.enum(["left", "right"]);
+
+/**
  * Display mode enum
  */
 export const DisplayModeSchema = z.enum(["label", "image", "image-label"]);
@@ -540,6 +545,40 @@ export const DeviceTypeSchema = z
   .passthrough();
 
 /**
+ * Rail Device Type schema - 0U devices with no rack-unit height.
+ * Deliberately separate from DeviceTypeSchema - see RailDeviceType in types/index.ts.
+ */
+export const RailDeviceTypeSchema = z
+  .object({
+    slug: SlugSchema,
+    manufacturer: z.string().max(100).optional(),
+    model: z.string().max(100).optional(),
+    part_number: z.string().max(100).optional(),
+    is_powered: z.boolean().optional(),
+    weight: z.number().positive().optional(),
+    weight_unit: WeightUnitSchema.optional(),
+    front_image: z.boolean().optional(),
+    rear_image: z.boolean().optional(),
+    colour: z
+      .string()
+      .regex(HEX_COLOUR_PATTERN, "Colour must be a valid 6-character hex code"),
+    category: DeviceCategorySchema,
+    tags: z.array(z.string()).optional(),
+    notes: z.string().optional(),
+    comments: z.string().optional(),
+    serial_number: z.string().optional(),
+    asset_tag: z.string().optional(),
+    links: z.array(DeviceLinkSchema).optional(),
+    custom_fields: z.record(z.string(), z.any()).optional(),
+    power_outlets: z.array(PowerOutletSchema).optional(),
+    va_rating: z.number().positive().optional(),
+    outlet_count: z.number().int().positive().optional(),
+  })
+  .passthrough();
+
+export type RailDeviceTypeZod = z.infer<typeof RailDeviceTypeSchema>;
+
+/**
  * Placed device schema - instance in rack
  * Position semantics:
  * - Rack-level devices: position is 1-indexed U position
@@ -618,6 +657,34 @@ export const PlacedDeviceSchema = z
   );
 
 /**
+ * Placed rail device schema - 0U device instance in a rack.
+ * No position/container fields - collision is "one per (side, face)", not U-range based.
+ */
+export const PlacedRailDeviceSchema = z
+  .object({
+    id: z.string().min(1, "ID is required"),
+    device_type: SlugSchema,
+    side: RailSideSchema,
+    face: DeviceFaceSchema,
+    name: z.string().max(100, "Name must be 100 characters or less").optional(),
+    notes: z.string().max(1000).optional(),
+    custom_fields: z.record(z.string(), z.any()).optional(),
+    colour_override: z
+      .string()
+      .regex(
+        /^#[0-9A-Fa-f]{6}$/,
+        "Colour must be a valid hex colour (e.g., #FF5555)",
+      )
+      .optional(),
+    // Reserved for future partial-height/stacked rail devices - unused by v1 logic
+    height_u: z.number().positive().optional(),
+    offset_u: z.number().min(0).optional(),
+  })
+  .passthrough();
+
+export type PlacedRailDeviceZod = z.infer<typeof PlacedRailDeviceSchema>;
+
+/**
  * Rack schema base (without id requirement for legacy migration)
  * Used internally - LayoutSchema transform ensures id is always present in output
  */
@@ -645,6 +712,7 @@ const RackSchemaInput = z
     starting_unit: z.number().int().min(1),
     position: z.number().int().min(0),
     devices: z.array(PlacedDeviceSchema),
+    rail_devices: z.array(PlacedRailDeviceSchema).optional(),
     notes: z.string().max(1000).optional(),
   })
   .passthrough();
@@ -677,6 +745,7 @@ export const RackSchema = z
     starting_unit: z.number().int().min(1),
     position: z.number().int().min(0),
     devices: z.array(PlacedDeviceSchema),
+    rail_devices: z.array(PlacedRailDeviceSchema).optional(),
     notes: z.string().max(1000).optional(),
   })
   .passthrough();
@@ -765,6 +834,7 @@ const LayoutSchemaInput = z
     rack: RackSchemaInput.optional(),
     rack_groups: z.array(RackGroupSchema).optional(),
     device_types: z.array(DeviceTypeSchema),
+    rail_device_types: z.array(RailDeviceTypeSchema).optional(),
     settings: LayoutSettingsSchema,
     connections: z.array(ConnectionSchema).optional(),
     /** @deprecated Use connections instead */
