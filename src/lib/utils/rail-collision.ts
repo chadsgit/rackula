@@ -7,7 +7,7 @@
  * this module does not import from or depend on.
  */
 
-import type { DeviceFace, PlacedRailDevice, Rack, RailSide } from "$lib/types";
+import type { DeviceFace, Rack, RailSide } from "$lib/types";
 import { doFacesCollide } from "$lib/utils/collision";
 
 /**
