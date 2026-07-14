@@ -3,8 +3,9 @@
  *
  * 0U rail-mounted devices don't occupy U-slot ranges - collision is
  * simply "is this (side, face) rail position already occupied?"
- * Deliberately separate from collision.ts (U-slot collision), which
- * this module does not import from or depend on.
+ * Deliberately separate from collision.ts (U-slot collision); depends on
+ * it only for the shared doFacesCollide face-semantics helper, not for
+ * any U-range/slot logic.
  */
 
 import type { DeviceFace, Rack, RailSide } from "$lib/types";

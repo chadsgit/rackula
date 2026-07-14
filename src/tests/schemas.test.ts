@@ -1599,16 +1599,46 @@ describe("LayoutSchema device ID deduplication (#1363)", () => {
           starting_unit: 1,
           position: 0,
           devices: [
-            { id: "dupe-id", device_type: "server-a", position: 100, face: "front" as const },
-            { id: "dupe-id", device_type: "server-b", position: 200, face: "front" as const },
-            { id: "unique-id", device_type: "server-c", position: 300, face: "front" as const },
+            {
+              id: "dupe-id",
+              device_type: "server-a",
+              position: 100,
+              face: "front" as const,
+            },
+            {
+              id: "dupe-id",
+              device_type: "server-b",
+              position: 200,
+              face: "front" as const,
+            },
+            {
+              id: "unique-id",
+              device_type: "server-c",
+              position: 300,
+              face: "front" as const,
+            },
           ],
         },
       ],
       device_types: [
-        { slug: "server-a", u_height: 1, colour: "#4A90A4", category: "server" as const },
-        { slug: "server-b", u_height: 1, colour: "#4A90A4", category: "server" as const },
-        { slug: "server-c", u_height: 1, colour: "#4A90A4", category: "server" as const },
+        {
+          slug: "server-a",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
+        {
+          slug: "server-b",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
+        {
+          slug: "server-c",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
       ],
       settings: baseSettings,
     };
@@ -1644,8 +1674,18 @@ describe("LayoutSchema device ID deduplication (#1363)", () => {
           starting_unit: 1,
           position: 0,
           devices: [
-            { id: "dupe-id", device_type: "server-a", position: 100, face: "front" as const },
-            { id: "dupe-id", device_type: "server-b", position: 200, face: "front" as const },
+            {
+              id: "dupe-id",
+              device_type: "server-a",
+              position: 100,
+              face: "front" as const,
+            },
+            {
+              id: "dupe-id",
+              device_type: "server-b",
+              position: 200,
+              face: "front" as const,
+            },
           ],
         },
         {
@@ -1659,15 +1699,40 @@ describe("LayoutSchema device ID deduplication (#1363)", () => {
           starting_unit: 1,
           position: 1,
           devices: [
-            { id: "dupe-id-2", device_type: "server-a", position: 100, face: "front" as const },
-            { id: "dupe-id-2", device_type: "server-c", position: 200, face: "front" as const },
+            {
+              id: "dupe-id-2",
+              device_type: "server-a",
+              position: 100,
+              face: "front" as const,
+            },
+            {
+              id: "dupe-id-2",
+              device_type: "server-c",
+              position: 200,
+              face: "front" as const,
+            },
           ],
         },
       ],
       device_types: [
-        { slug: "server-a", u_height: 1, colour: "#4A90A4", category: "server" as const },
-        { slug: "server-b", u_height: 1, colour: "#4A90A4", category: "server" as const },
-        { slug: "server-c", u_height: 1, colour: "#4A90A4", category: "server" as const },
+        {
+          slug: "server-a",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
+        {
+          slug: "server-b",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
+        {
+          slug: "server-c",
+          u_height: 1,
+          colour: "#4A90A4",
+          category: "server" as const,
+        },
       ],
       settings: baseSettings,
     };
@@ -1680,6 +1745,93 @@ describe("LayoutSchema device ID deduplication (#1363)", () => {
         const uniqueIds = new Set(deviceIds);
         expect(uniqueIds.size).toBe(deviceIds.length);
       }
+    }
+  });
+
+  it("regenerates duplicate rail device IDs within a rack", () => {
+    const layout = {
+      version: "0.7.0",
+      name: "Duplicate Rail Device ID Layout",
+      racks: [
+        {
+          id: "rack-1",
+          name: "Rack 1",
+          height: 42,
+          width: 19 as const,
+          desc_units: false,
+          show_rear: true,
+          form_factor: "4-post-cabinet" as const,
+          starting_unit: 1,
+          position: 0,
+          devices: [],
+          rail_devices: [
+            {
+              id: "dupe-rail-id",
+              device_type: "rail-pdu-a",
+              side: "left" as const,
+              face: "front" as const,
+            },
+            {
+              id: "dupe-rail-id",
+              device_type: "rail-pdu-b",
+              side: "right" as const,
+              face: "front" as const,
+            },
+            {
+              id: "unique-rail-id",
+              device_type: "rail-pdu-c",
+              side: "left" as const,
+              face: "rear" as const,
+            },
+          ],
+        },
+      ],
+      device_types: [],
+      settings: baseSettings,
+    };
+
+    const result = LayoutSchema.safeParse(layout);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const railDeviceIds =
+        result.data.racks[0].rail_devices?.map((rd) => rd.id) ?? [];
+      const uniqueIds = new Set(railDeviceIds);
+      expect(uniqueIds.size).toBe(railDeviceIds.length);
+      // The first occurrence keeps its original ID
+      expect(railDeviceIds[0]).toBe("dupe-rail-id");
+      // The second occurrence gets a new ID
+      expect(railDeviceIds[1]).not.toBe("dupe-rail-id");
+      // The unique one is untouched
+      expect(railDeviceIds[2]).toBe("unique-rail-id");
+    }
+  });
+
+  it("does not add a rail_devices key when the source rack has none", () => {
+    const layout = {
+      version: "0.7.0",
+      name: "No Rail Devices Layout",
+      racks: [
+        {
+          id: "rack-1",
+          name: "Rack 1",
+          height: 42,
+          width: 19 as const,
+          desc_units: false,
+          show_rear: true,
+          form_factor: "4-post-cabinet" as const,
+          starting_unit: 1,
+          position: 0,
+          devices: [],
+        },
+      ],
+      device_types: [],
+      settings: baseSettings,
+    };
+
+    const result = LayoutSchema.safeParse(layout);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.racks[0].rail_devices).toBeUndefined();
     }
   });
 });

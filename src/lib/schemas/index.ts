@@ -974,12 +974,32 @@ const LayoutSchemaBase = LayoutSchemaInput.transform((data) => {
         : { ...d, id: nextId, container_id: nextContainerId };
     });
 
+    // Deduplicate rail device IDs for the same reason (#1363). Rail devices
+    // have no container_id/slot system, so no id-remap bookkeeping is
+    // needed here. Rail device ids are also not deduped against regular
+    // device ids: the two arrays render in separate {#each} blocks, so a
+    // shared id string across the two isn't the each_key_duplicate problem.
+    const seenRailDeviceIds = new Set<string>();
+    const deduplicatedRailDevices = (rack.rail_devices ?? []).map((rd) => {
+      let nextId = rd.id;
+      if (seenRailDeviceIds.has(nextId)) {
+        do {
+          nextId = nanoid();
+        } while (seenRailDeviceIds.has(nextId));
+      }
+      seenRailDeviceIds.add(nextId);
+      return nextId === rd.id ? rd : { ...rd, id: nextId };
+    });
+
     return {
       ...rack,
       id: rack.id ?? nanoid(),
       devices: migratePositions
         ? migrateDevicePositions(deduplicatedDevices)
         : deduplicatedDevices,
+      ...(rack.rail_devices !== undefined
+        ? { rail_devices: deduplicatedRailDevices }
+        : {}),
     };
   });
 
