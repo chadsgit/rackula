@@ -4,7 +4,7 @@
  * Source: NetBox community devicetype-library
  */
 
-import type { DeviceType } from "$lib/types";
+import type { DeviceType, RailDeviceType } from "$lib/types";
 import { CATEGORY_COLOURS } from "$lib/types/constants";
 
 /**
@@ -151,43 +151,6 @@ export const eatonDevices: DeviceType[] = [
     colour: CATEGORY_COLOURS.power,
     category: "power",
   },
-  {
-    slug: "eaton-tripp-lite-b064-016-02-ipg",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B064-016-02-IPG",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-  },
-  {
-    slug: "eaton-tripp-lite-b064-032-01-ipg",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B064-032-01-IPG",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-  },
-  {
-    slug: "eaton-tripp-lite-b072-032-ip2",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B072-032-IP2",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-  },
-  {
-    slug: "eaton-tripp-lite-b096-016",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B096-016",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-  },
-
   // Additional devices from NetBox library (Issue #1109 Phase 1)
   {
     slug: "eaton-tripp-lite-pdumh15at",
@@ -215,30 +178,6 @@ export const eatonDevices: DeviceType[] = [
     rear_image: true,
   },
 
-  {
-    slug: "eaton-tripp-lite-b096-032",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B096-032",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-    front_image: true,
-    rear_image: true,
-  },
-
-  {
-    slug: "eaton-tripp-lite-b097-016",
-    u_height: 1,
-    manufacturer: "Eaton",
-    model: "Tripp Lite B097-016",
-    is_full_depth: false,
-    colour: CATEGORY_COLOURS.power,
-    category: "power",
-    front_image: true,
-    rear_image: true,
-  },
-
   // Additional devices from NetBox library (Issue #1111 Phase 2)
   {
     slug: "eaton-tripp-lite-smart1500lcd",
@@ -249,7 +188,7 @@ export const eatonDevices: DeviceType[] = [
     colour: CATEGORY_COLOURS.power,
     category: "power",
     front_image: true,
-    rear_image: true
+    rear_image: true,
   },
 
   {
@@ -261,7 +200,7 @@ export const eatonDevices: DeviceType[] = [
     colour: CATEGORY_COLOURS.power,
     category: "power",
     front_image: true,
-    rear_image: true
+    rear_image: true,
   },
 
   {
@@ -273,6 +212,64 @@ export const eatonDevices: DeviceType[] = [
     colour: CATEGORY_COLOURS.power,
     category: "power",
     front_image: true,
-    rear_image: true
+    rear_image: true,
+  },
+];
+
+/**
+ * Eaton (Tripp Lite) 0U vertical rail-mount PDUs.
+ * These physically mount to the rack's vertical rail, not a numbered U slot -
+ * see docs/superpowers/specs/2026-07-14-0u-rail-device-support-design.md.
+ * Model-line confirmation: B064/B072/B096/B097 are Tripp Lite's 0U vertical
+ * PDU product lines (verified against vendor model-naming convention during
+ * this change; if a specific SKU turns out to be a horizontal unit, move it
+ * back to eatonDevices in a follow-up).
+ */
+export const eatonRailDevices: RailDeviceType[] = [
+  {
+    slug: "eaton-tripp-lite-b064-016-02-ipg",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B064-016-02-IPG",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+  },
+  {
+    slug: "eaton-tripp-lite-b064-032-01-ipg",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B064-032-01-IPG",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+  },
+  {
+    slug: "eaton-tripp-lite-b072-032-ip2",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B072-032-IP2",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+  },
+  {
+    slug: "eaton-tripp-lite-b096-016",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B096-016",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+  },
+  {
+    slug: "eaton-tripp-lite-b096-032",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B096-032",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+    front_image: true,
+    rear_image: true,
+  },
+  {
+    slug: "eaton-tripp-lite-b097-016",
+    manufacturer: "Eaton",
+    model: "Tripp Lite B097-016",
+    colour: CATEGORY_COLOURS.power,
+    category: "power",
+    front_image: true,
+    rear_image: true,
   },
 ];

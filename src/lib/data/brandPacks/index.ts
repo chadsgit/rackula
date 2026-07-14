@@ -3,7 +3,7 @@
  * Exports all brand-specific device packs
  */
 
-import type { DeviceType, Airflow } from "$lib/types";
+import type { DeviceType, RailDeviceType, Airflow } from "$lib/types";
 import { debug } from "$lib/utils/debug";
 import { ubiquitiDevices } from "./ubiquiti";
 import { mikrotikDevices } from "./mikrotik";
@@ -15,7 +15,7 @@ import { supermicroDevices } from "./supermicro";
 import { hpeDevices } from "./hpe";
 // New brand packs
 import { fortinetDevices } from "./fortinet";
-import { eatonDevices } from "./eaton";
+import { eatonDevices, eatonRailDevices } from "./eaton";
 import { netgearDevices } from "./netgear";
 import { paloaltoDevices } from "./palo-alto";
 import { qnapDevices } from "./qnap";
@@ -43,6 +43,7 @@ export {
   // New brand packs
   fortinetDevices,
   eatonDevices,
+  eatonRailDevices,
   netgearDevices,
   paloaltoDevices,
   qnapDevices,
@@ -353,6 +354,24 @@ export function getAllBrandDevices(): DeviceType[] {
  */
 export function findBrandDevice(slug: string): DeviceType | undefined {
   return getAllBrandDevices().find((d) => d.slug === slug);
+}
+
+/**
+ * Get all rail (0U) devices from all brand packs as a single array.
+ * Only eaton currently has rail devices - other brand packs may be
+ * audited for the same u_height-forced-to-1 mistake in a follow-up.
+ */
+export function getAllBrandRailDeviceTypes(): RailDeviceType[] {
+  return [...eatonRailDevices];
+}
+
+/**
+ * Find a rail device type by slug across all brand packs.
+ */
+export function findBrandRailDeviceType(
+  slug: string,
+): RailDeviceType | undefined {
+  return getAllBrandRailDeviceTypes().find((d) => d.slug === slug);
 }
 
 // Cached set of all brand device slugs

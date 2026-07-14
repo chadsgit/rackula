@@ -30,6 +30,8 @@ export type CommandType =
   | "CREATE_RACK_GROUP"
   | "UPDATE_RACK_GROUP"
   | "DELETE_RACK_GROUP"
+  | "PLACE_RAIL_DEVICE"
+  | "REMOVE_RAIL_DEVICE"
   | "BATCH";
 
 /**

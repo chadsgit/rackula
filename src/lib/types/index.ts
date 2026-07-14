@@ -33,6 +33,13 @@ export interface LayoutMetadata {
 export type DeviceFace = "front" | "rear" | "both";
 
 /**
+ * Which vertical rail a 0U device mounts to.
+ * Combined with DeviceFace (front/rear), identifies one of up to 4 physical
+ * rail positions per rack: front-left, front-right, rear-left, rear-right.
+ */
+export type RailSide = "left" | "right";
+
+/**
  * Device category types - 13 predefined categories
  */
 export type DeviceCategory =
@@ -552,6 +559,58 @@ export interface DeviceType {
 }
 
 /**
+ * Rail Device Type - template definition for 0U (zero rack-unit) devices
+ * that mount to a rack's vertical rail rather than occupying a numbered U slot
+ * (e.g. vertical PDUs). Deliberately separate from DeviceType: DeviceType.u_height
+ * is read in 64+ places across the codebase under the assumption it's always a
+ * number, and rail devices have no rack-unit height at all.
+ */
+export interface RailDeviceType {
+  /** Unique identifier, kebab-case slug */
+  slug: string;
+  /** Manufacturer name */
+  manufacturer?: string;
+  /** Model name */
+  model?: string;
+  /** Part number / SKU */
+  part_number?: string;
+  /** Whether device is powered */
+  is_powered?: boolean;
+  /** Device weight */
+  weight?: number;
+  /** Weight unit (required if weight is provided) */
+  weight_unit?: WeightUnit;
+  /** Front image exists */
+  front_image?: boolean;
+  /** Rear image exists */
+  rear_image?: boolean;
+  /** Hex colour for display (e.g., '#4A90D9') */
+  colour: string;
+  /** Device category for UI filtering */
+  category: DeviceCategory;
+  /** User organization tags */
+  tags?: string[];
+  /** Notes/comments */
+  notes?: string;
+  /** Legacy comments field from NetBox imports */
+  comments?: string;
+  /** Serial number */
+  serial_number?: string;
+  /** Asset tag */
+  asset_tag?: string;
+  /** External links */
+  links?: DeviceLink[];
+  /** User-defined custom fields */
+  custom_fields?: Record<string, unknown>;
+  /** Power output outlets (for PDUs) */
+  power_outlets?: PowerOutlet[];
+  /** VA capacity (e.g., 1500, 3000) - for UPS devices */
+  va_rating?: number;
+  /** Legacy outlet count summary for power devices */
+  outlet_count?: number;
+}
+
+/**
  * Placed device - storage format
  * References a DeviceType by slug
  */
@@ -619,6 +678,37 @@ export interface PlacedDevice {
   custom_fields?: Record<string, unknown>;
 }
 
+/**
+ * Placed rail device - storage format
+ * References a RailDeviceType by slug. Lives in Rack.rail_devices, a
+ * separate array from Rack.devices — never participates in U-slot collision.
+ */
+export interface PlacedRailDevice {
+  /** Unique identifier (UUID) for stable references */
+  id: string;
+  /** Reference to RailDeviceType.slug */
+  device_type: string;
+  /** Which vertical rail this device mounts to */
+  side: RailSide;
+  /** Which face of the rack (front/rear) - combined with side identifies one of up to 4 rail positions */
+  face: DeviceFace;
+  /** Optional custom display name for this placement */
+  name?: string;
+  /** Notes for this placement */
+  notes?: string;
+  /** User-defined custom fields */
+  custom_fields?: Record<string, unknown>;
+  /** Custom colour for this specific placement (overrides device type colour) */
+  colour_override?: string;
+  /**
+   * Reserved for future partial-height / stacked rail devices.
+   * NOT used by v1 placement or collision logic - v1 collision is
+   * "at most one PlacedRailDevice per (side, face)", full stop.
+   */
+  height_u?: number;
+  offset_u?: number;
+}
+
 // =============================================================================
 // Rack Types
 // =============================================================================
@@ -647,6 +737,8 @@ export interface Rack {
   position: number;
   /** Devices placed in this rack */
   devices: PlacedDevice[];
+  /** 0U rail-mounted devices in this rack (left/right vertical rail, front/rear) */
+  rail_devices?: PlacedRailDevice[];
   /** Notes for this rack */
   notes?: string;
   /** Current view mode - runtime only, not persisted */
@@ -705,6 +797,8 @@ export interface Layout {
   rack_groups?: RackGroup[];
   /** Device type library */
   device_types: DeviceType[];
+  /** Rail (0U) device type library */
+  rail_device_types?: RailDeviceType[];
   /** Layout settings */
   settings: LayoutSettings;
   /** Port-to-port connections (MVP model) */

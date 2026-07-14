@@ -14,15 +14,16 @@ import type {
   DeviceFace,
   DeviceType,
   PlacedDevice,
+  PlacedRailDevice,
   Rack,
+  RailSide,
   SlotPosition,
 } from "$lib/types";
 import { UNITS_PER_U } from "$lib/types/constants";
 import { toInternalUnits, toHumanUnits } from "$lib/utils/position";
-import {
-  canPlaceDevice,
-  isSlotOccupied,
-} from "$lib/utils/collision";
+import { canPlaceDevice, isSlotOccupied } from "$lib/utils/collision";
+import { isRailSlotOccupied } from "$lib/utils/rail-collision";
+import { findRailDeviceType } from "$lib/utils/rail-device-lookup";
 import {
   createDeviceType as createDeviceTypeHelper,
   findDeviceType as findDeviceTypeInArray,
@@ -51,9 +52,12 @@ import {
   createUpdateRackCommand,
   createClearRackCommand,
   createBatchCommand,
+  createPlaceRailDeviceCommand,
+  createRemoveRailDeviceCommand,
   type DeviceTypeCommandStore,
   type DeviceCommandStore,
   type RackCommandStore,
+  type RailDeviceCommandStore,
 } from "../commands";
 import type { LayoutStateAccess } from "./types";
 import { getTargetRack, getRackById } from "./rack-actions";
@@ -78,6 +82,9 @@ import {
   replaceRackRaw,
   clearRackDevicesRaw,
   restoreRackDevicesRaw,
+  placeRailDeviceRaw,
+  removeRailDeviceAtIndexRaw,
+  getRailDeviceAtIndex,
 } from "./mutators";
 
 // =============================================================================
@@ -90,14 +97,21 @@ import {
  * Resolve the rack ID for adapter operations.
  * Uses active rack, validates it exists, and warns on fallback.
  */
-function resolveAdapterRackId(ctx: LayoutStateAccess, caller: string): string | undefined {
+function resolveAdapterRackId(
+  ctx: LayoutStateAccess,
+  caller: string,
+): string | undefined {
   const activeId = ctx.getActiveRackId();
   if (activeId) {
     // Validate the active rack still exists
     if (ctx.findRack(activeId)) {
       return activeId;
     }
-    layoutDebug.device("%s: activeRackId '%s' is stale (rack no longer exists), falling back", caller, activeId);
+    layoutDebug.device(
+      "%s: activeRackId '%s' is stale (rack no longer exists), falling back",
+      caller,
+      activeId,
+    );
   }
   // Fall back to first rack
   const target = getTargetRack(ctx);
@@ -133,7 +147,10 @@ function getAutoImportDeviceType(
  */
 export function getCommandStoreAdapter(
   ctx: LayoutStateAccess,
-): DeviceTypeCommandStore & DeviceCommandStore & RackCommandStore {
+): DeviceTypeCommandStore &
+  DeviceCommandStore &
+  RackCommandStore &
+  RailDeviceCommandStore {
   return {
     // DeviceTypeCommandStore
     addDeviceTypeRaw: (deviceType) => addDeviceTypeRaw(ctx, deviceType),
@@ -149,10 +166,8 @@ export function getCommandStoreAdapter(
     // DeviceCommandStore
     moveDeviceRaw: (index, newPosition) =>
       moveDeviceRaw(ctx, index, newPosition),
-    updateDeviceFaceRaw: (index, face) =>
-      updateDeviceFaceRaw(ctx, index, face),
-    updateDeviceNameRaw: (index, name) =>
-      updateDeviceNameRaw(ctx, index, name),
+    updateDeviceFaceRaw: (index, face) => updateDeviceFaceRaw(ctx, index, face),
+    updateDeviceNameRaw: (index, name) => updateDeviceNameRaw(ctx, index, name),
     updateDevicePlacementImageRaw: (index, face, filename) => {
       const rackId = resolveAdapterRackId(ctx, "updateDevicePlacementImageRaw");
       if (!rackId) {
@@ -194,6 +209,12 @@ export function getCommandStoreAdapter(
       updateDeviceIpRaw(ctx, rackId, index, ip);
     },
     getDeviceAtIndex: (index) => getDeviceAtIndex(ctx, index),
+
+    // RailDeviceCommandStore
+    placeRailDeviceRaw: (device) => placeRailDeviceRaw(ctx, device),
+    removeRailDeviceAtIndexRaw: (index) =>
+      removeRailDeviceAtIndexRaw(ctx, index),
+    getRailDeviceAtIndex: (index) => getRailDeviceAtIndex(ctx, index),
 
     // RackCommandStore
     updateRackRaw: (updates) => updateRackRaw(ctx, updates),
@@ -479,7 +500,10 @@ export function placeDeviceRecorded(
 
   if (autoImport) {
     const importCommand = createAddDeviceTypeCommand(autoImport, adapter);
-    const batch = createBatchCommand(`Place ${deviceName}`, [importCommand, placeCommand]);
+    const batch = createBatchCommand(`Place ${deviceName}`, [
+      importCommand,
+      placeCommand,
+    ]);
     history.execute(batch);
   } else {
     history.execute(placeCommand);
@@ -495,6 +519,54 @@ export function placeDeviceRecorded(
     isFullDepth,
     result: "success",
   });
+
+  return true;
+}
+
+/**
+ * Place a rail (0U) device with undo/redo support
+ * @param ctx - Layout state access
+ * @param rackId - Rack ID
+ * @param railDeviceTypeSlug - Rail device type slug
+ * @param side - Rail side ('left' or 'right')
+ * @param face - Rack face ('front', 'rear', or 'both')
+ * @returns true if placed successfully
+ */
+export function placeRailDeviceRecorded(
+  ctx: LayoutStateAccess,
+  rackId: string,
+  railDeviceTypeSlug: string,
+  side: RailSide,
+  face: DeviceFace,
+): boolean {
+  const targetRack = getRackById(ctx, rackId);
+  if (!targetRack) return false;
+
+  // Set active rack so Raw functions target the correct rack
+  ctx.setActiveRackId(rackId);
+
+  const layout = ctx.getLayout();
+  const railDeviceType = findRailDeviceType(
+    railDeviceTypeSlug,
+    layout.rail_device_types ?? [],
+  );
+  if (!railDeviceType) return false;
+
+  if (isRailSlotOccupied(targetRack, side, face)) return false;
+
+  const device: PlacedRailDevice = {
+    id: generateId(),
+    device_type: railDeviceTypeSlug,
+    side,
+    face,
+  };
+
+  const deviceName = railDeviceType.model ?? railDeviceType.slug;
+  const history = getHistoryStore();
+  const adapter = getCommandStoreAdapter(ctx);
+  const command = createPlaceRailDeviceCommand(device, adapter, deviceName);
+  history.execute(command);
+  ctx.markDirty();
 
   return true;
 }
@@ -617,7 +689,10 @@ export function moveDeviceRecorded(
       adapter,
       deviceName,
     );
-    const batchCommand = createBatchCommand(`Move ${deviceName}`, [moveCommand, slotCommand]);
+    const batchCommand = createBatchCommand(`Move ${deviceName}`, [
+      moveCommand,
+      slotCommand,
+    ]);
     history.execute(batchCommand);
   } else {
     history.execute(moveCommand);
@@ -670,6 +745,47 @@ export function removeDeviceRecorded(
   const adapter = getCommandStoreAdapter(ctx);
 
   const command = createRemoveDeviceCommand(
+    deviceIndex,
+    device,
+    adapter,
+    deviceName,
+  );
+  history.execute(command);
+  ctx.markDirty();
+}
+
+/**
+ * Remove a rail device with undo/redo support
+ * @param ctx - Layout state access
+ * @param rackId - Rack ID
+ * @param deviceIndex - Rail device index
+ * @param snapshotDevice - Function to snapshot the device (caller supplies $state.snapshot in .svelte.ts files)
+ */
+export function removeRailDeviceRecorded(
+  ctx: LayoutStateAccess,
+  rackId: string,
+  deviceIndex: number,
+  snapshotDevice: (device: PlacedRailDevice) => PlacedRailDevice,
+): void {
+  const targetRack = getRackById(ctx, rackId);
+  if (!targetRack) return;
+  const railDevices = targetRack.rail_devices ?? [];
+  if (deviceIndex < 0 || deviceIndex >= railDevices.length) return;
+
+  ctx.setActiveRackId(rackId);
+
+  const device = snapshotDevice(railDevices[deviceIndex]!);
+  const layout = ctx.getLayout();
+  const railDeviceType = findRailDeviceType(
+    device.device_type,
+    layout.rail_device_types ?? [],
+  );
+  const deviceName =
+    railDeviceType?.model ?? railDeviceType?.slug ?? "rail device";
+
+  const history = getHistoryStore();
+  const adapter = getCommandStoreAdapter(ctx);
+  const command = createRemoveRailDeviceCommand(
     deviceIndex,
     device,
     adapter,
