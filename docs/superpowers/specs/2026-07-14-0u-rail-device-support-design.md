@@ -27,15 +27,22 @@ system. This mirrors how the container/slot system (v0.6.0) was added as its own
 concept for a different kind of "doesn't compete for U-slot collision" device, rather than
 bolted onto the main collision path.
 
-The device *type* (library template) stays unified: `DeviceType` gets one new optional
-discriminator field rather than forking into two parallel type hierarchies, so the device
-library, search, filtering, and brand-pack format don't fork either.
+The device *type* (library template) is a separate `RailDeviceType` interface and a parallel
+`layout.rail_device_types` array, not an extension of `DeviceType`/`layout.device_types`.
+`DeviceType.u_height` is read in 64 places across 25 files under TypeScript strict mode; making
+it optional (the original plan) would force null-handling into every one of those call sites
+regardless of whether they'll ever see a rail device. A dedicated `RailDeviceType` with no
+`u_height` field at all keeps the existing type and its 64 consumers completely untouched, at
+the cost of a small amount of duplicated device-library plumbing (palette listing, search) to
+also surface rail device types alongside regular ones.
 
 ## Decisions
 
-- `DeviceType.mount_type?: 'rack-u' | 'rail'`, default `'rack-u'` — every existing device type
-  is unaffected. When `mount_type: 'rail'`, `u_height` becomes optional in the Zod schema
-  (conditionally, via `.superRefine` or a discriminated union) instead of required-min-0.5.
+- `RailDeviceType` interface (new, separate from `DeviceType`) with no `u_height` field —
+  covers the same identity/metadata fields as `DeviceType` (slug, manufacturer, model,
+  part_number, colour, category, tags, notes, links, custom_fields, power_outlets) minus
+  anything rack-U-specific. New `layout.rail_device_types: RailDeviceType[]` array, parallel to
+  `layout.device_types`.
 - New `PlacedRailDevice` type, new `rack.rail_devices: PlacedRailDevice[]` array. Does not touch
   `PlacedDevice`, `rack.devices`, or the existing U-slot collision code in `collision.ts`.
 - `side: 'left' | 'right'` + `face: DeviceFace` (reusing the existing front/rear/both type)
@@ -55,11 +62,13 @@ library, search, filtering, and brand-pack format don't fork either.
   pattern as every other device placement in Rackula. `rack-drop-coordinator.ts` gets a new
   drop-zone check for the rail x-coordinate ranges, dispatching a rail-placement mutator instead
   of the existing U-position calculation.
-- Brand pack: reclassify Eaton's Tripp Lite `B064`/`B072`/`B096`/`B097` lines from
-  `u_height: 1` to `mount_type: 'rail'` (dropping `u_height`). Leave `PDUMH*`, `PW1*`, and the
-  UPS entries (`5PX`/`9PX`/`SMART*`) alone — those are genuinely rack-mount. Exact
-  model-by-model confirmation against Tripp Lite/Eaton datasheets is an implementation-time
-  verification task, not asserted here from memory.
+- Brand pack: move Eaton's Tripp Lite `B064`/`B072`/`B096`/`B097` lines (currently wrongly
+  `u_height: 1` in `eatonDevices: DeviceType[]`) out into a new `eatonRailDevices:
+  RailDeviceType[]` export in the same file, aggregated in `brandPacks/index.ts` alongside the
+  existing `eatonDevices` wiring. Leave `PDUMH*`, `PW1*`, and the UPS entries (`5PX`/`9PX`/
+  `SMART*`) in the regular array — those are genuinely rack-mount. Exact model-by-model
+  confirmation against Tripp Lite/Eaton datasheets is an implementation-time verification task,
+  not asserted here from memory.
 - Greenfield fix, no migration path: existing saved layouts referencing a reclassified slug at
   a U position become an orphaned reference, same as any other breaking device-type change.
   Matches this repo's stated "no migration or legacy support" philosophy.
