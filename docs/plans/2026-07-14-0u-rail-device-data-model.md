@@ -669,6 +669,7 @@ describe("placeRailDeviceRaw", () => {
     const device = createTestRailDevice({ side: "left", face: "front" });
     const index = placeRailDeviceRaw(ctx, device);
     expect(index).toBe(0);
+    // eslint-disable-next-line no-restricted-syntax -- placing one device should leave exactly one rail device in the array
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(1);
   });
 
@@ -699,6 +700,7 @@ describe("removeRailDeviceAtIndexRaw", () => {
     placeRailDeviceRaw(ctx, device);
     const removed = removeRailDeviceAtIndexRaw(ctx, 0);
     expect(removed?.id).toBe(device.id);
+    // eslint-disable-next-line no-restricted-syntax -- removing the only placed device should leave zero rail devices
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(0);
   });
 
@@ -1506,6 +1508,7 @@ describe("placeRailDeviceRecorded", () => {
     addRailDeviceTypeRaw(ctx, createTestRailDeviceType({ slug: "my-rail-pdu" }));
     const result = placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "left", "front");
     expect(result).toBe(true);
+    // eslint-disable-next-line no-restricted-syntax -- placing one device should leave exactly one rail device in the array
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(1);
   });
 
@@ -1528,6 +1531,7 @@ describe("placeRailDeviceRecorded", () => {
     placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "left", "front");
     const second = placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "left", "front");
     expect(second).toBe(false);
+    // eslint-disable-next-line no-restricted-syntax -- placing on an occupied slot must be rejected, leaving exactly one rail device
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(1);
   });
 
@@ -1537,6 +1541,7 @@ describe("placeRailDeviceRecorded", () => {
     placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "left", "front");
     const second = placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "right", "front");
     expect(second).toBe(true);
+    // eslint-disable-next-line no-restricted-syntax -- placing on the opposite side must succeed, leaving exactly two rail devices
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(2);
   });
 });
@@ -1547,12 +1552,14 @@ describe("removeRailDeviceRecorded", () => {
     addRailDeviceTypeRaw(ctx, createTestRailDeviceType({ slug: "my-rail-pdu" }));
     placeRailDeviceRecorded(ctx, "rack-1", "my-rail-pdu", "left", "front");
     removeRailDeviceRecorded(ctx, "rack-1", 0, (d) => d);
+    // eslint-disable-next-line no-restricted-syntax -- removing the only placed device should leave zero rail devices
     expect(ctx.getLayout().racks[0]!.rail_devices).toHaveLength(0);
   });
 
   it("is a no-op for an out-of-range index", () => {
     const ctx = createTestCtx();
     removeRailDeviceRecorded(ctx, "rack-1", 0, (d) => d);
+    // eslint-disable-next-line no-restricted-syntax -- an out-of-range removal is a no-op, leaving zero rail devices
     expect(ctx.getLayout().racks[0]!.rail_devices ?? []).toHaveLength(0);
   });
 });
@@ -1804,22 +1811,27 @@ describe("rail device store integration", () => {
     expect(placed).toBe(true);
 
     const rackAfterPlace = store.layout.racks.find((r) => r.id === rack.id);
+    // eslint-disable-next-line no-restricted-syntax -- placing one device should leave exactly one rail device
     expect(rackAfterPlace?.rail_devices).toHaveLength(1);
 
     store.undo();
     const rackAfterUndo = store.layout.racks.find((r) => r.id === rack.id);
+    // eslint-disable-next-line no-restricted-syntax -- undo must leave exactly zero rail devices
     expect(rackAfterUndo?.rail_devices ?? []).toHaveLength(0);
 
     store.redo();
     const rackAfterRedo = store.layout.racks.find((r) => r.id === rack.id);
+    // eslint-disable-next-line no-restricted-syntax -- redo must restore exactly one rail device
     expect(rackAfterRedo?.rail_devices).toHaveLength(1);
 
     store.removeRailDeviceFromRack(rack.id, 0);
     const rackAfterRemove = store.layout.racks.find((r) => r.id === rack.id);
+    // eslint-disable-next-line no-restricted-syntax -- removing the device must leave exactly zero rail devices
     expect(rackAfterRemove?.rail_devices ?? []).toHaveLength(0);
 
     store.undo();
     const rackAfterRemoveUndo = store.layout.racks.find((r) => r.id === rack.id);
+    // eslint-disable-next-line no-restricted-syntax -- undoing the removal must restore exactly one rail device
     expect(rackAfterRemoveUndo?.rail_devices).toHaveLength(1);
   });
 
@@ -1870,7 +1882,7 @@ Expected: all tests pass, including every new file added in Tasks 1-9.
 - [ ] **Step 2: Run lint**
 
 Run: `npm run lint`
-Expected: no violations (in particular, confirm none of the new tests trip the ESLint hard-blocks on `toHaveLength(literal)`, DOM queries, or hardcoded colours — the plan's tests were written to avoid these, but lint is the actual gate).
+Expected: no violations. The plan's `toHaveLength(literal)` assertions are all annotated with `eslint-disable-next-line no-restricted-syntax -- <justification>` as behavioral invariants (placement/removal must leave an exact count); none of the new tests use DOM queries or hardcoded colour assertions. This step confirms the annotations actually satisfy the linter, not just that they look right.
 
 - [ ] **Step 3: Run the full build**
 
